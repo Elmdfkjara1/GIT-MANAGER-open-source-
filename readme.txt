@@ -50,3 +50,5 @@ Cada vez que quieras utilizar Git Manager, ejecutá:
 A partir de ese momento, el script se encargará de automatizar las tareas de Git configuradas en el proyecto.
 
 > **Nota:** Si el script sigue sin ejecutarse después de estos pasos, verificá que estés ubicado en la carpeta donde se encuentra `git-main.ps1`.
+
+fecha: 7/9/26
