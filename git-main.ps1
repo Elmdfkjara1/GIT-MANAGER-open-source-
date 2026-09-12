@@ -1,22 +1,8 @@
-﻿# git-main.ps1
-# Herramienta CLI interactiva para el flujo de git del equipo.
-#
-# Uso:
-#   .\git-main.ps1
-
-
-# ============================================================
-# CONFIGURACIÓN
-# ============================================================
-
-$MAIN_BRANCH = "main"
+﻿$MAIN_BRANCH = "main"
 $REMOTE = "origin"
 
 
-# ============================================================
-# FUNCIONES AUXILIARES BÁSICAS
-# ============================================================
-
+# FUNCIONES AUXILIARES 
 function Write-ErrorAndExit {
     param ([string]$Message)
 
@@ -157,25 +143,24 @@ function Get-OrSetRemoteUrl {
 }
 
 
-# ============================================================
+
 # BANNER Y MENÚ
-# ============================================================
 
 function Write-Banner {
     Clear-Host
     Write-Host ""
 
-    Write-Host "   _____ _____ _______    __  __    _    ___ _   _ " -ForegroundColor Green
-    Write-Host "  / ____|_   _|__   __|  |  \/  |  / \  |_ _| \ | |" -ForegroundColor Green
-    Write-Host " | |  __  | |    | |     | |\/| | / _ \  | ||  \| |" -ForegroundColor Green
-    Write-Host " | | |_ | | |    | |     | |  | |/ ___ \ | || |\  |" -ForegroundColor Green
-    Write-Host " | |__| |_| |_   | |     | |  | /_/   \_\___|_| \_|" -ForegroundColor Green
-    Write-Host "  \_____|_____|  |_|     |_|  |_|                 " -ForegroundColor Green
+    Write-Host "   _____ _____ _______    __  __    _    ___ _   _ " -ForegroundColor Blue
+    Write-Host "  / ____|_   _|__   __|  |  \/  |  / \  |_ _| \ | |" -ForegroundColor Blue
+    Write-Host " | |  __  | |    | |     | |\/| | / _ \  | ||  \| |" -ForegroundColor White
+    Write-Host " | | |_ | | |    | |     | |  | |/ ___ \ | || |\  |" -ForegroundColor White
+    Write-Host " | |__| |_| |_   | |     | |  | /_/   \_\___|_| \_|" -ForegroundColor Blue
+    Write-Host "  \_____|_____|  |_|     |_|  |_|                 " -ForegroundColor Blue
 
     Write-Host ""
-    Write-Host " ============================================================" -ForegroundColor DarkGreen
-    Write-Host "                    GIT MAIN MANAGER" -ForegroundColor Green
-    Write-Host " ============================================================" -ForegroundColor DarkGreen
+    Write-Host " ============================================================" -ForegroundColor Yellow
+    Write-Host "                    GIT MAIN MANAGER" -ForegroundColor Yellow
+    Write-Host " ============================================================" -ForegroundColor Yellow
     Write-Host ""
 
     $branch = git branch --show-current
@@ -184,7 +169,7 @@ function Write-Banner {
     Write-Host "$branch" -ForegroundColor Yellow
 
     Write-Host ""
-    Write-Host " ============================================================" -ForegroundColor DarkGreen
+    Write-Host " ============================================================" -ForegroundColor Yellow
     Write-Host ""
 }
 
@@ -203,9 +188,9 @@ function Show-Menu {
 }
 
 
-# ============================================================
-# FLUJO COMPARTIDO: MAIN <- MERGE <- PUSH -> VOLVER (uso en equipo)
-# ============================================================
+
+# FLUJO COMPARTIDO: MAIN <- MERGE <- PUSH -> VOLVER
+
 
 function Invoke-MergeToMainAndPush {
     param ([string]$MyBranch)
@@ -261,9 +246,9 @@ function Invoke-MergeToMainAndPush {
 }
 
 
-# ============================================================
-# OPCIÓN 1: SUBIR TODO (rama personal -> main)
-# ============================================================
+
+# OPCIÓN 1: SUBIR TODO (rama personal - main)
+
 
 function Invoke-PushFlow {
 
@@ -302,9 +287,9 @@ function Invoke-PushFlow {
 }
 
 
-# ============================================================
+
 # OPCIÓN 2: ACTUALIZAR TU RAMA CON MAIN
-# ============================================================
+
 
 function Invoke-UpdateFlow {
 
@@ -350,9 +335,8 @@ function Invoke-UpdateFlow {
 }
 
 
-# ============================================================
+
 # OPCIÓN 3: SELECCIÓN DE ARCHIVOS PUNTUALES
-# ============================================================
 
 function Invoke-SelectiveFlow {
 
@@ -435,9 +419,9 @@ function Invoke-SelectiveFlow {
 }
 
 
-# ============================================================
+
 # OPCIÓN 4: REPOSITORIO SOLITARIO (trabajás directo en main)
-# ============================================================
+
 
 function Invoke-SoloFlow {
 
@@ -518,9 +502,9 @@ function Invoke-SoloFlow {
 }
 
 
-# ============================================================
+
 # LOOP PRINCIPAL
-# ============================================================
+
 
 while ($true) {
 
