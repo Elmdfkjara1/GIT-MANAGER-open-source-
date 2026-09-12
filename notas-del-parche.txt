@@ -2,5 +2,5 @@
 
 -Se actualizo el banner. 
 -Nuevo sistema de informacion sobre el hardware y versiones del powershell. 
--Se agrego el apartado contacto, donde por el momento se incorporo GMAIL y GITHUB
+-Se agrego el apartado contacto, donde por el momento se incorporo GMAIL y GITH
 
