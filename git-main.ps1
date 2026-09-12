@@ -81,7 +81,7 @@ function Test-Prerequisites {
     if (-not $AllowMain) {
         git show-ref --verify --quiet "refs/heads/$MAIN_BRANCH"
         if ($LASTEXITCODE -ne 0) {
-            Write-ErrorAndExit "La rama '$MAIN_BRANCH' no existe localmente."
+            Write-ErrorAndExit "La rama '$MAIN_BRANCH' no existe localmente / estas trabajando en un proyecto solitario, para eso selecciona la opcion 4."
         }
     }
 }
@@ -144,32 +144,66 @@ function Get-OrSetRemoteUrl {
 
 
 
-# BANNER Y MENÚ
+# BANNER Y MENÚ  -- estilo bandera Argentina (celeste / blanco / sol amarillo)
 
-function Write-Banner {
+function Show-Banner {
     Clear-Host
+    $user = $env:USERNAME
+    $pc   = $env:COMPUTERNAME
+    $os   = (Get-CimInstance Win32_OperatingSystem).Caption
+    $ram  = [math]::Round((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB, 1)
+    $cpu  = (Get-CimInstance Win32_Processor).Name
+    $upSpan = (Get-Date) - (Get-CimInstance Win32_OperatingSystem).LastBootUpTime
+    $uptime = "{0}d {1}h {2}m" -f $upSpan.Days, $upSpan.Hours, $upSpan.Minutes
+
+    $C1 = "Cyan"      # celeste
+    $C2 = "White"     # blanco
+
+    # Título grande "GIT MANAGER" en colores de la bandera argentina
+    # (celeste - blanco - celeste, como las franjas, aplicado al texto)
+    $titleLines = @(
+        " ███  █████ █████     █   █  ███  █   █  ███   ███  █████ ████  ",
+        "█       █     █       ██ ██ █   █ ██  █ █   █ █     █     █   █ ",
+        "█  ██   █     █       █ █ █ █████ █ █ █ █████ █  ██ ████  ████  ",
+        "█   █   █     █       █   █ █   █ █  ██ █   █ █   █ █     █  █  ",
+        " ████ █████   █       █   █ █   █ █   █ █   █  ████ █████ █   █ "
+    )
+    $titleColors = @($C1, $C1, $C2, $C1, $C1)
+
     Write-Host ""
-
-    Write-Host "   _____ _____ _______    __  __    _    ___ _   _ " -ForegroundColor Blue
-    Write-Host "  / ____|_   _|__   __|  |  \/  |  / \  |_ _| \ | |" -ForegroundColor Blue
-    Write-Host " | |  __  | |    | |     | |\/| | / _ \  | ||  \| |" -ForegroundColor White
-    Write-Host " | | |_ | | |    | |     | |  | |/ ___ \ | || |\  |" -ForegroundColor White
-    Write-Host " | |__| |_| |_   | |     | |  | /_/   \_\___|_| \_|" -ForegroundColor Blue
-    Write-Host "  \_____|_____|  |_|     |_|  |_|                 " -ForegroundColor Blue
-
+    for ($i = 0; $i -lt $titleLines.Count; $i++) {
+        Write-Host "  $($titleLines[$i])" -ForegroundColor $titleColors[$i]
+    }
     Write-Host ""
-    Write-Host " ============================================================" -ForegroundColor Yellow
-    Write-Host "                    GIT MAIN MANAGER" -ForegroundColor Yellow
-    Write-Host " ============================================================" -ForegroundColor Yellow
-    Write-Host ""
+    Write-Host "  ┌──────────────────────────────────────────┐" -ForegroundColor $C2
+    Write-Host "  │ " -NoNewline -ForegroundColor $C2
+    Write-Host ("{0}@{1}" -f $user, $pc) -NoNewline -ForegroundColor $C1
+    Write-Host (" " * (42 - ("$user@$pc").Length)) -NoNewline
+    Write-Host "│" -ForegroundColor $C2
+    Write-Host "  ├──────────────────────────────────────────┤" -ForegroundColor $C2
 
-    $branch = git branch --show-current
+    $info = @(
+        @{k="OS";     v=$os}
+        @{k="CPU";    v=$cpu}
+        @{k="RAM";    v="$ram GB"}
+        @{k="Uptime"; v=$uptime}
+        @{k="Shell";  v="PowerShell $($PSVersionTable.PSVersion)"}
+        @{k="Rama";   v=(git branch --show-current 2>$null)}
+    )
 
-    Write-Host "  [*] Rama actual: " -NoNewline -ForegroundColor Cyan
-    Write-Host "$branch" -ForegroundColor Yellow
+    foreach ($item in $info) {
+        $label = $item.k.PadRight(7)
+        $value = $item.v
+        Write-Host "  │ " -NoNewline -ForegroundColor $C2
+        Write-Host $label -NoNewline -ForegroundColor $C1
+        $line = ": $value"
+        if ($line.Length -gt 35) { $line = $line.Substring(0,32) + "..." }
+        Write-Host $line -NoNewline -ForegroundColor White
+        Write-Host (" " * (35 - $line.Length)) -NoNewline
+        Write-Host "│" -ForegroundColor $C2
+    }
 
-    Write-Host ""
-    Write-Host " ============================================================" -ForegroundColor Yellow
+    Write-Host "  └──────────────────────────────────────────┘" -ForegroundColor $C2
     Write-Host ""
 }
 
@@ -180,6 +214,7 @@ function Show-Menu {
     Write-Host "  [2] Actualizar tu rama con los cambios de main" -ForegroundColor White
     Write-Host "  [3] Elegir archivos puntuales para subir" -ForegroundColor White
     Write-Host "  [4] Repositorio solitario (trabajas directo en main)" -ForegroundColor White
+    Write-Host "  [5] Contacto" -ForegroundColor White
     Write-Host "  [0] Salir" -ForegroundColor White
     Write-Host " ============================================" -ForegroundColor DarkGray
     Write-Host ""
@@ -500,15 +535,33 @@ function Invoke-SoloFlow {
     Write-Host "$branch -> $REMOTE/$branch" -ForegroundColor Green
     Write-Host ""
 }
+#Contacto
 
 
+function Show-ContactInfo {
+    Write-Host ""
+    Write-Host " ============================================================" -ForegroundColor Yellow
+    Write-Host "  CONTACTO" -ForegroundColor Cyan
+    Write-Host " ============================================================" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "  Gmail  : jaratomas01022008@gmail.com" -ForegroundColor White
+    Write-Host "  GitHub : https://github.com/Elmdfkjara1" -ForegroundColor Cyan
+    Write-Host ""
+    
+    $open = Read-Host "¿Querés abrir el GitHub? (s/n)"
 
+    if ($open.ToLower() -eq "s") {
+        Start-Process "https://github.com/Elmdfkjara1"
+    }
+
+    Write-Host ""
+}
 # LOOP PRINCIPAL
 
 
 while ($true) {
 
-    Write-Banner
+    Show-Banner
     $option = Show-Menu
 
     switch ($option) {
@@ -516,6 +569,7 @@ while ($true) {
         "2" { Invoke-UpdateFlow }
         "3" { Invoke-SelectiveFlow }
         "4" { Invoke-SoloFlow }
+        "5" { Show-ContactInfo }
         "0" { exit 0 }
         default { Write-Host "Opción inválida." -ForegroundColor Red }
     }
