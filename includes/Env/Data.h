@@ -5,6 +5,8 @@
 namespace git {
 	struct Data{
 		std::string branch;
+		std::string authorName;
+		std::string authorEmail;
 	};
 	std::string calculateHash(std::string_view content);
 	std::string compress(std::string_view content);

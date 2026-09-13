@@ -97,10 +97,8 @@ std::string change::Commit::commit(std::string_view message){
     std::string treeHash = makeTree();
     if (treeHash.empty()) return "";
 
-    std::string authorName = "gitManager";
-    std::string authorEmail = "gitManager@local.com";
-    if (const char* envName = std::getenv("GIT_AUTHOR_NAME")) authorName = envName;
-    if (const char* envEmail = std::getenv("GIT_AUTHOR_EMAIL")) authorEmail = envEmail;
+    std::string authorName = userData.authorName;
+    std::string authorEmail = userData.authorEmail;
 
     std::time_t now = std::time(nullptr);
     std::string timestamp = std::to_string(now) + " -0300";

@@ -1,5 +1,9 @@
 #include "Change/Git.h"
 #include <stdio.h>
+#include <filesystem> 
+#include <vector>
+
+namespace fs = std::filesystem;
 
 #ifdef WIN32
 	#include <direct.h>
@@ -46,6 +50,8 @@ void change::Git::makeobjects(){
 void change::Git::makeRefs(){
     mkdir((gitPath + "/refs/").c_str(), 0777);
     mkdir((gitPath + "/refs/heads/").c_str(), 0777);
+    auto* _ = fopen((gitPath + "/refs/heads/master").c_str(), "w");
+    fclose(_);
     mkdir((gitPath + "/refs/tags/").c_str(), 0777);
 } 
 
@@ -85,4 +91,101 @@ void change::Git::makeGit(){
 	makeConfig();
 	makeDescription();
 	makeHEAD();
+}
+void change::Git::makeGitConfig(std::string_view name, std::string_view email) {
+    fs::path homeDir;
+    #ifdef WIN32
+        if (const char* userProfile = std::getenv("USERPROFILE")) {
+            homeDir = userProfile;
+        }
+    #else
+        if (const char* home = std::getenv("HOME")) {
+            homeDir = home;
+        }
+    #endif
+
+    if (homeDir.empty()) return;
+
+    fs::path globalConfigPath = homeDir / ".gitconfig";
+    std::vector<std::string> lines;
+    bool userSectionFound = false;
+    bool nameUpdated = false;
+    bool emailUpdated = false;
+
+    if (fs::exists(globalConfigPath)) {
+        FILE* file = fopen(globalConfigPath.string().c_str(), "r");
+        if (file) {
+            char buffer[256];
+            while (fgets(buffer, sizeof(buffer), file) != nullptr) {
+                lines.push_back(buffer);
+            }
+            fclose(file);
+        }
+    }
+
+    bool inUserSection = false;
+    for (auto& line : lines) {
+        std::string trimmed = line;
+        size_t first = trimmed.find_first_not_of(" \t\r\n");
+        if (first == std::string::npos) continue;
+        size_t last = trimmed.find_last_not_of(" \t\r\n");
+        trimmed = trimmed.substr(first, (last - first + 1));
+
+        if (trimmed.front() == '[' && trimmed.back() == ']') {
+            std::string section = trimmed.substr(1, trimmed.size() - 2);
+            inUserSection = (section == "user");
+            if (inUserSection) userSectionFound = true;
+            continue;
+        }
+
+        if (inUserSection) {
+            size_t eqPos = trimmed.find('=');
+            if (eqPos != std::string::npos) {
+                std::string key = trimmed.substr(0, eqPos);
+                key.erase(0, key.find_first_not_of(" \t"));
+                key.erase(key.find_last_not_of(" \t") + 1);
+
+                if (key == "name") {
+                    line = "\tname = " + std::string(name) + "\n";
+                    nameUpdated = true;
+                } else if (key == "email") {
+                    line = "\temail = " + std::string(email) + "\n";
+                    emailUpdated = true;
+                }
+            }
+        }
+    }
+
+    if (userSectionFound) {
+        auto it = lines.begin();
+        while (it != lines.end()) {
+            if (it->find("[user]") != std::string::npos) {
+                ++it;
+                if (!nameUpdated) {
+                    it = lines.insert(it, "\tname = " + std::string(name) + "\n");
+                    ++it;
+                }
+                if (!emailUpdated) {
+                    lines.insert(it, "\temail = " + std::string(email) + "\n");
+                }
+                break;
+            }
+            ++it;
+        }
+    } else {
+        if (!lines.empty() && (lines.back().empty() || lines.back().back() != '\n')) {
+            lines.back() += "\n";
+        }
+        lines.push_back("\n[user]\n");
+        lines.push_back("\temail = " + std::string(email) + "\n");
+        lines.push_back("\tname = " + std::string(name) + "\n");
+    }
+
+    FILE* outFile = fopen(globalConfigPath.string().c_str(), "w");
+    if (outFile) {
+        for (const auto& line : lines) {
+            fputs(line.c_str(), outFile);
+        }
+        fclose(outFile);
+    }
 }

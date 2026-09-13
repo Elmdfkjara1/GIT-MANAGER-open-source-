@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <sys/stat.h>
+#include <vector>
 
 namespace git::change{
 	class Add {
@@ -17,5 +18,7 @@ namespace git::change{
 		}
 
 		void addFile(std::string_view name);
+		void removeFile(std::string_view name);
+		std::vector<std::string> getStagedFiles();
 	};
 }

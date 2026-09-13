@@ -20,5 +20,6 @@ namespace git::change{
 		}
 
 		void makeGit();
+		void makeGitConfig(std::string_view name, std::string_view email);
 	};
 }//namespace git::change

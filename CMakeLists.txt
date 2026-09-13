@@ -25,6 +25,7 @@ add_subdirectory(src)
 add_executable(gitManager src/main.cpp)
 
 target_link_libraries(gitManager PRIVATE
+    gitFront
     changeGit
     envGit
     ZLIB::ZLIB

@@ -2,6 +2,7 @@
 
 #include "Data.h"
 #include <string_view>
+#include <vector>
 
 namespace git::env {
 
@@ -14,6 +15,9 @@ namespace git::env {
 		bool check();
 		bool checkGit();
 		void checkBranch();
+		bool checkGitVar();
+
+		std::vector<std::string> scanBranches();
 		
 		const Data& getUser() const { return user; }
 		Data& getUser() { return user; }

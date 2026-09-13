@@ -154,3 +154,125 @@ void change::Add::addFile(std::string_view name){
 
     updateIndex(name, rawHash, sizeBytes, fileInfo);
 }
+
+void change::Add::removeFile(std::string_view name) {
+    std::string indexPath = path + "/index";
+    FILE* file = fopen(indexPath.c_str(), "rb");
+    if (!file) return;
+
+    fseek(file, 0, SEEK_END);
+    long size = ftell(file);
+    rewind(file);
+
+    if (size < 28) {
+        fclose(file);
+        return;
+    }
+
+    std::string content;
+    content.resize(size);
+    fread(content.data(), 1, size, file);
+    fclose(file);
+
+    if (content.compare(0, 4, "DIRC") != 0) return;
+
+    uint32_t diskCount;
+    memcpy(&diskCount, content.data() + 8, 4);
+    uint32_t count = ntohl(diskCount);
+
+    size_t offset = 12;
+    std::string newEntries;
+    uint32_t newCount = 0;
+
+    for (uint32_t i = 0; i < count && offset < content.size() - 20; ++i) {
+        if (offset + 62 > content.size() - 20) break;
+
+        size_t nameStart = offset + 62;
+        size_t nullPos = content.find('\0', nameStart);
+        if (nullPos == std::string::npos) break;
+
+        std::string entryName = content.substr(nameStart, nullPos - nameStart);
+
+        size_t entrySize = (nullPos + 1 - offset);
+        while (entrySize % 8 != 0) {
+            entrySize++;
+        }
+
+        if (offset + entrySize > content.size() - 20) break;
+
+        std::string currentEntry = content.substr(offset, entrySize);
+
+        if (entryName != name) {
+            newEntries.append(currentEntry);
+            newCount++;
+        }
+
+        offset += entrySize;
+    }
+
+    std::string newIndex;
+    newIndex.append("DIRC", 4);
+    uint32_t verNet = htonl(2);
+    uint32_t countNet = htonl(newCount);
+    newIndex.append(reinterpret_cast<char*>(&verNet), 4);
+    newIndex.append(reinterpret_cast<char*>(&countNet), 4);
+    newIndex.append(newEntries);
+
+    unsigned char checksum[SHA_DIGEST_LENGTH];
+    getRawHash(newIndex, checksum);
+    newIndex.append(reinterpret_cast<char*>(checksum), SHA_DIGEST_LENGTH);
+
+    FILE* f = fopen(indexPath.c_str(), "wb");
+    if (f) {
+        fwrite(newIndex.data(), 1, newIndex.size(), f);
+        fclose(f);
+    }
+}
+std::vector<std::string> change::Add::getStagedFiles() {
+    std::vector<std::string> stagedFiles;
+    std::string indexPath = path + "/index";
+    
+    FILE* file = fopen(indexPath.c_str(), "rb");
+    if (!file) return stagedFiles;
+
+    fseek(file, 0, SEEK_END);
+    long size = ftell(file);
+    rewind(file);
+
+    if (size < 28) {
+        fclose(file);
+        return stagedFiles;
+    }
+
+    std::string content;
+    content.resize(size);
+    fread(content.data(), 1, size, file);
+    fclose(file);
+
+    if (content.compare(0, 4, "DIRC") != 0) return stagedFiles;
+
+    uint32_t diskCount;
+    memcpy(&diskCount, content.data() + 8, 4);
+    uint32_t count = ntohl(diskCount);
+
+    size_t offset = 12;
+    for (uint32_t i = 0; i < count && offset < content.size() - 20; ++i) {
+        if (offset + 62 > content.size() - 20) break;
+
+        size_t nameStart = offset + 62;
+        size_t nullPos = content.find('\0', nameStart);
+        if (nullPos == std::string::npos) break;
+
+        std::string entryName = content.substr(nameStart, nullPos - nameStart);
+        stagedFiles.push_back(entryName);
+
+        size_t entrySize = (nullPos + 1 - offset);
+        while (entrySize % 8 != 0) {
+            entrySize++;
+        }
+
+        offset += entrySize;
+    }
+
+    return stagedFiles;
+}
