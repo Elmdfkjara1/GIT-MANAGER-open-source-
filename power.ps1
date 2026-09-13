@@ -1,4 +1,6 @@
-﻿$MAIN_BRANCH = "main"
+﻿#By Tomas jara <Elmdfkjara1> https://github.com/Elmdfkjara1 
+
+$MAIN_BRANCH = "main"
 $REMOTE = "origin"
 
 
