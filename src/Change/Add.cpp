@@ -1,0 +1,156 @@
+#include "Change/Add.h"
+#include "Env/Data.h"
+#include <cstring>
+#include <openssl/sha.h>
+
+#ifdef WIN32
+	#include <direct.h>
+	#include <winsock2.h>
+	#define mkdir(path) _mkdir(path)
+#else
+	#include <sys/stat.h>
+	#include <arpa/inet.h>
+	#define mkdir(path) mkdir(path, 0777)
+#endif
+
+
+using namespace git;
+
+void change::Add::updateIndex(std::string_view name, const unsigned char* rawHash, size_t fileSize, const struct stat& st) {
+    std::string index;
+    uint32_t currentCount = 1;
+    std::string indexPath = std::string(path) + "/index";
+
+    FILE* existingFile = fopen(indexPath.c_str(), "rb");
+    if (existingFile) {
+        fseek(existingFile, 0, SEEK_END);
+        long size = ftell(existingFile);
+        rewind(existingFile);
+
+        if (size > 20) {
+            index.resize(size - 20);
+            fread(index.data(), 1, size - 20, existingFile);
+            
+            uint32_t diskCount;
+            memcpy(&diskCount, index.data() + 8, 4);
+            currentCount = ntohl(diskCount) + 1;
+            
+            uint32_t newCountNet = htonl(currentCount);
+            memcpy(index.data() + 8, &newCountNet, 4);
+        }
+        fclose(existingFile);
+    } else {
+        index.append("DIRC");
+        uint32_t ver = htonl(2);
+        uint32_t countNet = htonl(1);
+        index.append(reinterpret_cast<char*>(&ver), 4);
+        index.append(reinterpret_cast<char*>(&countNet), 4);
+    }
+
+    std::string entry;
+    
+    uint32_t ctime_sec = htonl(static_cast<uint32_t>(st.st_ctime));
+    uint32_t ctime_nsec = 0;
+    entry.append(reinterpret_cast<char*>(&ctime_sec), 4);
+    entry.append(reinterpret_cast<char*>(&ctime_nsec), 4);
+
+    uint32_t mtime_sec = htonl(static_cast<uint32_t>(st.st_mtime));
+    uint32_t mtime_nsec = 0;
+    entry.append(reinterpret_cast<char*>(&mtime_sec), 4);
+    entry.append(reinterpret_cast<char*>(&mtime_nsec), 4);
+
+    uint32_t dev = htonl(static_cast<uint32_t>(st.st_dev));
+    uint32_t ino = htonl(static_cast<uint32_t>(st.st_ino));
+    entry.append(reinterpret_cast<char*>(&dev), 4);
+    entry.append(reinterpret_cast<char*>(&ino), 4);
+
+    uint32_t mode = htonl(0100644); 
+    entry.append(reinterpret_cast<char*>(&mode), 4);
+
+    uint32_t uid = htonl(static_cast<uint32_t>(st.st_uid));
+    uint32_t gid = htonl(static_cast<uint32_t>(st.st_gid));
+    entry.append(reinterpret_cast<char*>(&uid), 4);
+    entry.append(reinterpret_cast<char*>(&gid), 4);
+
+    uint32_t netSize = htonl(static_cast<uint32_t>(fileSize));
+    entry.append(reinterpret_cast<char*>(&netSize), 4);
+
+    entry.append(reinterpret_cast<const char*>(rawHash), SHA_DIGEST_LENGTH);
+
+    uint16_t flags = htons(static_cast<uint16_t>(name.size() & 0xFFF));
+    entry.append(reinterpret_cast<char*>(&flags), 2);
+
+    entry.append(name);
+    entry.push_back('\0');
+
+    size_t entrySize = 62 + name.size() + 1;
+    while (entrySize % 8 != 0) {
+        entry.push_back('\0');
+        entrySize++;
+    }
+
+    index.append(entry);
+
+    unsigned char indexChecksum[SHA_DIGEST_LENGTH];
+    getRawHash(index, indexChecksum);
+    index.append(reinterpret_cast<char*>(indexChecksum), SHA_DIGEST_LENGTH);
+
+    FILE* f = fopen(indexPath.c_str(), "wb");
+    if (f) {
+        fwrite(index.data(), 1, index.size(), f);
+        fclose(f);
+    }
+}
+
+
+void change::Add::addFile(std::string_view name){
+    std::string fullPath = std::string(path) + std::string("../") +std::string(name);
+    
+    struct stat fileInfo;
+    if (stat(fullPath.c_str(), &fileInfo) != 0) return;
+
+    FILE* file = fopen(fullPath.c_str(), "rb");
+    if(!file) return;
+
+    fseek(file, 0, SEEK_END);
+    long sizeBytes = ftell(file);
+    rewind(file);
+
+    std::string header = "blob " + std::to_string(sizeBytes);
+    header.push_back('\0');
+
+    std::string content;
+    content.resize(sizeBytes);
+    fread(content.data(), 1, sizeBytes, file);
+    fclose(file);
+
+    std::string finalContent = header + content;
+    
+    unsigned char rawHash[SHA_DIGEST_LENGTH];
+    getRawHash(finalContent, rawHash);
+
+    static constexpr char hex_chars[] = "0123456789abcdef";
+    std::string hash;
+    hash.resize(40);
+    for (int i = 0; i < SHA_DIGEST_LENGTH; ++i) {
+        hash[2 * i]     = hex_chars[(rawHash[i] >> 4) & 0x0F];
+        hash[2 * i + 1] = hex_chars[rawHash[i] & 0x0F];
+    }
+
+    std::string compress_str = compress(finalContent);  
+
+    std::string dir = hash.substr(0, 2);
+    std::string filename = hash.substr(2);
+
+    std::string objectPath = std::string(path) + std::string("/objects/") + dir;
+    mkdir(objectPath.c_str());
+
+    std::string filenamePath = objectPath + "/" + filename;
+    FILE* newFile = fopen(filenamePath.c_str(), "wb");
+    if (newFile) {
+        fwrite(compress_str.data(), 1, compress_str.size(), newFile);
+        fclose(newFile);
+    }
+
+    updateIndex(name, rawHash, sizeBytes, fileInfo);
+}

@@ -53,9 +53,9 @@ void env::Detector::checkBranch(){
 	fclose(head);
 }
 
-envState env::Detector::check(){
+bool env::Detector::check(){
 	if(!checkGit()){
-		return without_git_file;
+		return false;
 	}
-	return all_right;
+	return true;
 }

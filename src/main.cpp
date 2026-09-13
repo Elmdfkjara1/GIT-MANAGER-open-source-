@@ -1,5 +1,9 @@
 #include "Env/Detector.h"
+
 #include "Change/Branch.h"
+#include "Change/Git.h"
+#include "Change/Add.h"
+#include "Change/Commit.h"
 
 #include <stdio.h>
 #include <filesystem>
@@ -12,19 +16,19 @@ int main(void) {
 
 	git::env::Detector dec(literalPath);
 	git::change::Branch branch(literalPath, dec.getUser());
+	git::change::Git gitMk(literalPath);
+	git::change::Add add(literalPath);
+	git::change::Commit commit(literalPath, dec.getUser());
 
-
-	git::envState state = dec.check();
-	
-	if(state == git::all_right){
-		printf("Rama: %s", dec.getUser().branch.c_str());
-		printf("Creando rama 'hola'\n");
-		branch.createNewBranch("hola");
-		printf("Cambiando a la rama 'hola'\n");
-		branch.changeBranch("hola");
+	if(dec.check()){
+		printf("Branch: %s\n", dec.getUser().branch.c_str());
+		printf("Commit with the message \"I WANNA SLEEP\" \n");
+		commit.commit("I WANNA SLEEP");
+		dec.check();
 	}
 	else{
-		printf("Sin rama actual\n");
+		printf("Repository Git is not inicializate\nMaking it\n");
+		gitMk.makeGit();
 	}
 
 
