@@ -15,6 +15,12 @@
 * You should have received a copy of the GNU General Public License
 * along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
+#ifdef _MSC_VER
+    #include <cstdlib>
+    #define bswap32(x) _byteswap_ulong(x)
+#else
+    #define bswap32(x) __builtin_bswap32(x)
+#endif
 #include "Change/Commit.h"
 #include "Env/Data.h"
 #include <stdio.h>
@@ -72,7 +78,7 @@ std::string change::Commit::makeTree(){
     uint32_t entryCount = 0;
     memcpy(&entryCount, header + 8, sizeof(uint32_t));
 
-    entryCount = __builtin_bswap32(entryCount);
+    entryCount = bswap32(entryCount);
     std::vector<unsigned char> treeContent;
 
     for (uint32_t i = 0; i < entryCount; ++i) {

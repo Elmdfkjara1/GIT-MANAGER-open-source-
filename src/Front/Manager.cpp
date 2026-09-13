@@ -25,12 +25,70 @@
 #include <chrono>
 #include <cstring>
 
-#include <termios.h>
-#include <unistd.h>
+#ifdef _WIN32
+    #include <conio.h>
+#else
+    #include <termios.h>
+    #include <unistd.h>
+#endif
 
 namespace fs = std::filesystem;
 
 using namespace git;
+
+enum class NavKey { Up, Down, Space, Enter, Quit, New, None };
+
+namespace {
+#ifdef _WIN32
+    struct RawModeGuard { RawModeGuard() {} ~RawModeGuard() {} };
+
+    NavKey readNavKey() {
+        int ch = _getch();
+        if (ch == 0 || ch == 0xE0) {
+            int arrow = _getch();
+            if (arrow == 72) return NavKey::Up;
+            if (arrow == 80) return NavKey::Down;
+            return NavKey::None;
+        }
+        if (ch == ' ') return NavKey::Space;
+        if (ch == '\r' || ch == '\n') return NavKey::Enter;
+        if (ch == 'q' || ch == 'Q') return NavKey::Quit;
+        if (ch == 'n' || ch == 'N') return NavKey::New;
+        return NavKey::None;
+    }
+#else
+    struct RawModeGuard {
+        termios oldt;
+        RawModeGuard() {
+            tcgetattr(STDIN_FILENO, &oldt);
+            termios newt = oldt;
+            newt.c_lflag &= ~(ICANON | ECHO);
+            tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+        }
+        ~RawModeGuard() { tcsetattr(STDIN_FILENO, TCSANOW, &oldt); }
+    };
+
+    NavKey readNavKey() {
+        char c;
+        if (read(STDIN_FILENO, &c, 1) != 1) return NavKey::Quit;
+        if (c == '\033') {
+            char seq[2];
+            if (read(STDIN_FILENO, &seq[0], 1) != 1) return NavKey::None;
+            if (read(STDIN_FILENO, &seq[1], 1) != 1) return NavKey::None;
+            if (seq[0] == '[') {
+                if (seq[1] == 'A') return NavKey::Up;
+                if (seq[1] == 'B') return NavKey::Down;
+            }
+            return NavKey::None;
+        }
+        if (c == ' ') return NavKey::Space;
+        if (c == '\n' || c == '\r') return NavKey::Enter;
+        if (c == 'q' || c == 'Q') return NavKey::Quit;
+        if (c == 'n' || c == 'N') return NavKey::New;
+        return NavKey::None;
+    }
+#endif
+}
 
 
 Front::Manager::Manager()
@@ -158,11 +216,7 @@ struct FileStatus {
 };
 
 void Front::Manager::driveStatus(){
-    termios oldt, newt;
-    tcgetattr(STDIN_FILENO, &oldt);
-    newt = oldt;
-    newt.c_lflag &= ~(ICANON | ECHO);
-    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+    RawModeGuard rawMode;
 
     fs::path rootPath = literalPath;
 
@@ -191,7 +245,6 @@ void Front::Manager::driveStatus(){
     }
 
     if (files.empty()) {
-        tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
         printf("\033[2J\033[H\033[91mNo files found in workspace.\033[0m\n");
         return;
     }
@@ -217,34 +270,25 @@ void Front::Manager::driveStatus(){
 
     render();
 
-    char c;
-    while (read(STDIN_FILENO, &c, 1) == 1) {
-        if (c == '\033') {
-            char seq[2];
-            if (read(STDIN_FILENO, &seq[0], 1) != 1) continue;
-            if (read(STDIN_FILENO, &seq[1], 1) != 1) continue;
-
-            if (seq[0] == '[') {
-                if (seq[1] == 'A') {
-                    if (selectedIndex == 0) selectedIndex = files.size() - 1;
-                    else selectedIndex--;
-                } else if (seq[1] == 'B') {
-                    selectedIndex = (selectedIndex + 1) % files.size();
-                }
-            }
-        } else if (c == ' ') { 
+    bool enterPressed = false;
+    while (true) {
+        NavKey key = readNavKey();
+        if (key == NavKey::Quit) break;
+        if (key == NavKey::Up) {
+            if (selectedIndex == 0) selectedIndex = files.size() - 1;
+            else selectedIndex--;
+        } else if (key == NavKey::Down) {
+            selectedIndex = (selectedIndex + 1) % files.size();
+        } else if (key == NavKey::Space) {
             files[selectedIndex].selected = !files[selectedIndex].selected;
-        } else if (c == 'q' || c == 'Q') {
-            break;
-        } else if (c == '\n' || c == '\r') {
+        } else if (key == NavKey::Enter) {
+            enterPressed = true;
             break;
         }
         render();
     }
 
-    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
-
-    if (c == '\n' || c == '\r') {
+    if (enterPressed) {
         bool stagedAny = false;
         for (const auto& file : files) {
             if (file.selected) {
@@ -300,11 +344,7 @@ void Front::Manager::driveCommit(){
 }
 
 void Front::Manager::driveBranch(){
-    termios oldt, newt;
-    tcgetattr(STDIN_FILENO, &oldt);
-    newt = oldt;
-    newt.c_lflag &= ~(ICANON | ECHO);
-    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+    RawModeGuard rawMode;
 
     std::vector<std::string> branches = dec.scanBranches();
     const std::string& currentBranch = dec.getUser().branch;
@@ -337,23 +377,16 @@ void Front::Manager::driveBranch(){
 
     render();
 
-    char c;
-    while (read(STDIN_FILENO, &c, 1) == 1) {
-        if (c == '\033') {
-            char seq[2];
-            if (read(STDIN_FILENO, &seq[0], 1) != 1) continue;
-            if (read(STDIN_FILENO, &seq[1], 1) != 1) continue;
+    bool enterPressed = false;
+    while (true) {
+        NavKey key = readNavKey();
+        if (key == NavKey::Quit) break;
 
-            if (seq[0] == '[') {
-                if (seq[1] == 'A') {
-                    selectedIndex = (selectedIndex - 1 + totalOptions) % totalOptions;
-                } else if (seq[1] == 'B') {
-                    selectedIndex = (selectedIndex + 1) % totalOptions;
-                }
-            }
-        } else if (c == 'n' || c == 'N') {
-            tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
-            
+        if (key == NavKey::Up) {
+            selectedIndex = (selectedIndex - 1 + totalOptions) % totalOptions;
+        } else if (key == NavKey::Down) {
+            selectedIndex = (selectedIndex + 1) % totalOptions;
+        } else if (key == NavKey::New) {
             printf("\033[2J\033[H");
             printf("\033[96mEnter new branch name:\033[0m ");
             char nameBuffer[128];
@@ -364,18 +397,16 @@ void Front::Manager::driveBranch(){
                     wait("\033[95mCreating branch...\033[0m");
                 }
             }
+            dec.checkBranch();
             return;
-        } else if (c == 'q' || c == 'Q') {
-            break;
-        } else if (c == '\n' || c == '\r') {
+        } else if (key == NavKey::Enter) {
+            enterPressed = true;
             break;
         }
         render();
     }
 
-    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
-
-    if (c == '\n' || c == '\r') {
+    if (enterPressed) {
         if (selectedIndex == branches.size()) {
             printf("\033[2J\033[H");
             printf("\033[96mEnter new branch name:\033[0m ");
